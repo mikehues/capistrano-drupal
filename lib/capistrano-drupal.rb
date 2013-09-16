@@ -22,6 +22,8 @@ Capistrano::Configuration.instance(:must_exist).load do
   set :shared_children, ['files', 'private']
   set :additional_shared_assets, []
 
+  set :domains, ["default"]
+
   after "deploy:update_code", "drupal:symlink_shared", "drush:site_offline", "drush:updatedb", "drush:cache_clear", "drush:site_online"
 
   namespace :deploy do
@@ -41,9 +43,11 @@ Capistrano::Configuration.instance(:must_exist).load do
       dirs = [deploy_to, releases_path, shared_path].join(' ')
       run "#{try_sudo} mkdir -p #{releases_path} #{shared_path}"
       run "#{try_sudo} chown -R #{user}:#{runner_group} #{deploy_to}"
-      sub_dirs = shared_children.map { |d| File.join(shared_path, d) }
-      run "#{try_sudo} mkdir -p #{sub_dirs.join(' ')}"
-      run "#{try_sudo} chmod 2775 #{sub_dirs.join(' ')}"
+      domains.each do |domain|
+        sub_dirs = shared_children.map { |d| File.join(shared_path, "#{domain}/", d) }
+        run "#{try_sudo} mkdir -p #{sub_dirs.join(' ')}"
+        run "#{try_sudo} chmod 2775 #{sub_dirs.join(' ')}"
+      end
     end
   end
 
@@ -52,8 +56,10 @@ Capistrano::Configuration.instance(:must_exist).load do
       and sites/default/files directory to be correctly linked to the shared directory on a new deployment. \
       Also, symlink and assets specified with :additional_shared_assets."
     task :symlink_shared do
-      ["files", "private", "settings.php"].each do |asset|
-        run "rm -rf #{app_path}/#{asset} && ln -nfs #{shared_path}/#{asset} #{app_path}/sites/default/#{asset}"
+      domains.each do |domain|
+        ["files", "private", "settings.php"].each do |asset|
+          run "rm -rf #{app_path}/sites/#{domain}/#{asset} && ln -nfs #{shared_path}/#{domain}/#{asset} #{app_path}/sites/#{domain}/#{asset}"
+        end
       end
 
       additional_shared_assets.each do |asset|
@@ -82,29 +88,39 @@ Capistrano::Configuration.instance(:must_exist).load do
 
     desc "Backup the database"
     task :backupdb, :on_error => :continue do
-      run "#{drush_cmd} -r #{app_path} bam-backup"
+      domains.each do |domain|
+        run "#{drush_cmd} -r #{app_path} -l #{domain} bam-backup"
+      end
     end
 
     desc "Run Drupal database migrations if required"
     task :updatedb, :on_error => :continue do
-      run "#{drush_cmd} -r #{app_path} updatedb -y"
+      domains.each do |domain|
+        run "#{drush_cmd} -r #{app_path} -l #{domain} updatedb -y"
+      end
     end
 
     desc "Clear the drupal cache"
     task :cache_clear, :on_error => :continue do
-      run "#{drush_cmd} -r #{app_path} cc all"
+      domains.each do |domain|
+        run "#{drush_cmd} -r #{app_path} -l #{domain} cc all"
+      end
     end
 
     desc "Set the site offline"
     task :site_offline, :on_error => :continue do
-      run "#{drush_cmd} -r #{app_path} vset site_offline 1 -y"
-      run "#{drush_cmd} -r #{app_path} vset maintenance_mode 1 -y"
+      domains.each do |domain|
+        run "#{drush_cmd} -r #{app_path} -l #{domain} vset site_offline 1 -y"
+        run "#{drush_cmd} -r #{app_path} -l #{domain} vset maintenance_mode 1 -y"
+      end
     end
 
     desc "Set the site online"
     task :site_online, :on_error => :continue do
-      run "#{drush_cmd} -r #{app_path} vset site_offline 0 -y"
-      run "#{drush_cmd} -r #{app_path} vset maintenance_mode 0 -y"
+      domains.each do |domain|
+        run "#{drush_cmd} -r #{app_path} -l #{domain} vset site_offline 0 -y"
+        run "#{drush_cmd} -r #{app_path} -l #{domain} vset maintenance_mode 0 -y"
+      end
     end
 
   end
