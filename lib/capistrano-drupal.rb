@@ -49,6 +49,11 @@ Capistrano::Configuration.instance(:must_exist).load do
         run "#{try_sudo} chmod 2775 #{sub_dirs.join(' ')}"
       end
     end
+
+    desc "Skip finalize_update"
+    task :finalize_update do
+      puts "    Skipping finalize_update becuase this is not a Rails application."
+    end
   end
 
   namespace :drupal do
