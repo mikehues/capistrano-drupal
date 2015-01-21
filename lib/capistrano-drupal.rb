@@ -24,7 +24,7 @@ Capistrano::Configuration.instance(:must_exist).load do
 
   set :domains, ["default"]
 
-  after "deploy:update_code", "drupal:symlink_shared", "drush:site_offline", "drush:updatedb", "drush:cache_clear", "drush:site_online"
+  after "deploy:update_code", "drupal:symlink_shared", "drush:backupdb", "drush:site_offline", "drush:updatedb", "drush:cache_clear", "drush:site_online"
 
   namespace :deploy do
     desc <<-DESC
@@ -89,7 +89,7 @@ Capistrano::Configuration.instance(:must_exist).load do
     desc "Backup the database"
     task :backupdb, :on_error => :continue do
       domains.each do |domain|
-        run "#{drush_cmd} -r #{app_path} -l #{domain} bam-backup"
+        run "#{drush_cmd} -r #{previous_release} -l #{domain} bam-backup"
       end
     end
 
